@@ -9,6 +9,8 @@
 #include "zos_sys.h"
 #include "zos_video.h"
 
+#include "keyboard.h"
+
 //函数声明
 void randArray(int a[], int n);
 void rotateMatrix(int data[4][4], int count);
@@ -104,6 +106,7 @@ void randArray(int a[], int n) {
 
 //显示界面
 void show(int data[4][4]) {
+    ioctl(DEV_STDOUT, CMD_CLEAR_SCREEN, NULL);
 	printf("\n2048-zos");
 	for (int i = 0; i < 4; i++) {
 		printf("\n|-----|-----|-----|-----|\n|");
@@ -140,15 +143,13 @@ void rotateMatrix(int data[4][4], int count) {
 }
 
 //保存文件
-void saveFile() {
+void saveFile(void) {
 	zos_dev_t dev = open("B:/2048.dat", O_WRONLY | O_CREAT | O_TRUNC);
-	if (dev == NULL) {
-		printf("\nUnable to save game\n");
-		return;
+    if (dev < 0) {
+        printf("Error opening B:/2048.dat %d (%02x)\n", -dev, -dev);
+        exit(-dev);
 	}
-	else if (dev < 0) {
-        printf("Error %d occured3\n", dev);
-	}
+
 	char *buffer = malloc(64); // 用malloc()函数分配一块内存空间，并用一个指针变量来指向它
 	int index = 0; // 定义一个索引变量来记录buffer中的位置
 	for (int i = 0; i < 4; i++) {
@@ -166,21 +167,16 @@ void saveFile() {
 }
 
 //读取文件
-void readFile() {
-    zos_dev_t dev2 = open("B:/2048.dat", O_RDONLY);
-	if (dev2 == NULL) {
-		printf("\nNo game save, starting a new game...\n");
-		init(data, 2);
-		return;
-	}
-	else if (dev2 < 0) {
+void readFile(void) {
+    zos_dev_t dev = open("B:/2048.dat", O_RDONLY);
+    if (dev < 0) {
         printf("\nNo game save, starting a new game...\n");
 		init(data, 2);
 		return;
 	}
 	char *buffer = malloc(256); // 用malloc()函数分配一块内存空间，并用一个指针变量来指向它
 	uint16_t size = 256; // 定义一个变量来记录读取的字节数
-	read(dev2, buffer, &size); // 从文件中读取64个字节到buffer中
+	read(dev, buffer, &size); // 从文件中读取64个字节到buffer中
 	int index = 0; // 定义一个索引变量来记录buffer中的位置
 	char *endptr; // 定义一个指针变量来记录字符串的结束位置
 	for (int i = 0; i < 4; i++) {
@@ -191,14 +187,14 @@ void readFile() {
 		index += 1; // 更新索引，跳过换行符
 	}
 	free(buffer); // 用free()函数释放内存空间
-	close(dev2);
+	close(dev);
 }
 
-int main() {
+int main(void) {
 	int ch;//方向
 
     // system("clear");
-	ioctl(DEV_STDOUT, CMD_CLEAR_SCREEN, NULL);
+	// ioctl(DEV_STDOUT, CMD_CLEAR_SCREEN, NULL);
 	printf("1: New Game\n");
 	printf("2: Load Game\n");
 	ch = getchar();
@@ -210,38 +206,45 @@ int main() {
 		ioctl(DEV_STDOUT, CMD_CLEAR_SCREEN, NULL);
 		readFile();
 	}
-	getchar(); // 读取回车键
 
+    kb_mode_non_block_raw();
+    show(data);
 	while (1) {
-		show(data);
-		ch = getchar();
-		getchar(); // 读取回车键
-		if (ch == 'Q') {
-			break;
-		}
+		ch = getkey();
 		switch (ch) {
-			case 'w': // Up
+            case KB_ESC:
+                goto quit;
+            case KB_UP_ARROW: // fall-thru
+			case KB_KEY_W: // Up
 				mergerUp(data);
 				newNum(data, 2);
+                show(data);
 				break;
-			case 'd': // Right
+            case KB_RIGHT_ARROW: // fall-thru
+			case KB_KEY_D: // Right
 				mergerRight(data);
 				newNum(data, 2);
+                show(data);
 				break;
-			case 's': // Down
+            case KB_DOWN_ARROW: // fall-thru
+			case KB_KEY_S: // Down
 				mergerDown(data);
 				newNum(data, 2);
+                show(data);
 				break;
-			case 'a': // Left
+            case KB_LEFT_ARROW: // fall-thru
+			case KB_KEY_A: // Left
 				mergerLeft(data);
 				newNum(data, 2);
+                show(data);
 				break;
-			case 'S': // Save
+			case KB_F1: // Save
 				saveFile();
+                printf("Game saved.\n\n");
 				return 0;
 		}
-		saveFile();
-		ioctl(DEV_STDOUT, CMD_CLEAR_SCREEN, NULL);
 	}
+quit:
+    printf("Game not saved.\n\n");
 	return 0;
 }
