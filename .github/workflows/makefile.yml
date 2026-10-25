@@ -1,31 +1,32 @@
-name: Makefile CI
+name: CMake CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   build:
-
-    runs-on: debian-bookworm
-
+    runs-on: ubuntu-24.04
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-    - name: Clone Zeal-8-bit-OS repository
-      run: git clone https://github.com/Zeal8bit/Zeal-8-bit-OS.git
+      - name: Set up Zeal development environment
+        uses: zoul0813/zeal-dev-environment/github/setup-zde@main
 
-    - name: Set ZOS_PATH environment variable
-      run: echo "ZOS_PATH=$(pwd)/Zeal-8-bit-OS" >> $GITHUB_ENV
+      - name: Build with the Zeal CMake toolchain
+        run: zde cmake
 
-    - name: Update apt
-      run: sudo apt update
-
-    - name: Install sdcc
-      run: sudo apt install sdcc=4.3.0
-
-    - name: Run make
-      run: make
+      - name: Save the binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: 2048
+          path: bin/2048.bin
+          if-no-files-found: error
